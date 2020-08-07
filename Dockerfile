@@ -8,6 +8,10 @@ ARG LOCAL_IVY=no
 
 FROM jupyter/base-notebook as coursier_base
 
+ENV NB_UID 1000
+ENV NB_GID 100
+ENV NB_USER jovyan
+
 USER root
 
 RUN apt-get -y update && \
@@ -23,7 +27,13 @@ RUN curl -Lo /usr/local/bin/coursier https://github.com/coursier/coursier/releas
 
 USER $NB_UID
 
+FROM almondsh/almond as coursier_runtime
+
+COPY --from=almondsh/almond /home/jovyan/.cache /home/jovyan/.cache
+RUN chown -R jovyan /home/jovyan/.cache
+
 # ensure the JAR of the CLI is in the coursier cache, in the image
+# ENV COURSIER_REPOSITORIES "ivy2Local|http://nexus.k8s.uc.host.dxy/repository/maven-public/|central|sonatype:releases"
 RUN /usr/local/bin/coursier --help
 
 FROM coursier_base as local_ivy_yes
@@ -40,6 +50,10 @@ ARG ALMOND_VERSION
 ARG SCALA_VERSIONS
 USER $NB_UID
 COPY scripts/install-kernels.sh .
+COPY --from=almondsh/almond /home/jovyan/.cache /home/jovyan/.cache
+USER root
+RUN chown -R jovyan /home/jovyan/.cache
+USER $NB_UID
 RUN ./install-kernels.sh && \
     rm install-kernels.sh && \
     rm -rf .ivy2
